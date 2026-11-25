@@ -415,15 +415,18 @@ function renderSplit(card, group) {
     amountInput.inputMode = "decimal";
     amountInput.value = amount;
     amountInput.setAttribute("aria-label", `จำนวนเงินของ${group.segmentLabels[index]}`);
+    let committed = false;
     const commitAmount = () => {
-      clearTimeout(amountInput.commitTimer);
+      if (committed) return;
+      committed = true;
       group.points = setSegmentAmount(group.points, index, amountInput.value, group.allocationTotal, group.segmentLocks);
       renderSplit(card, group);
       persist();
     };
-    amountInput.addEventListener("input", () => {
-      clearTimeout(amountInput.commitTimer);
-      amountInput.commitTimer = setTimeout(commitAmount, 350);
+    amountInput.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      commitAmount();
     });
     amountInput.addEventListener("change", commitAmount);
     amountLabel.append(amountInput);
