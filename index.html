@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Kanit:wght@500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=20261125-2" />
+    <link rel="stylesheet" href="styles.css?v=20261125-3" />
   </head>
   <body>
     <header class="topbar">
@@ -19,6 +19,7 @@
       </a>
       <div class="header-actions">
         <span class="save-status" id="saveStatus" role="status">บันทึกอัตโนมัติ</span>
+        <button class="undo-button" id="undoButton" type="button" disabled title="ย้อนกลับ (Ctrl+Z)" aria-label="ย้อนกลับการแก้ไขล่าสุด">↶ <span>ย้อนกลับ</span></button>
         <button class="button button-secondary" id="shareButton" type="button">
           <span aria-hidden="true">↗</span> <span class="share-label">แชร์หน้านี้</span>
         </button>
@@ -90,6 +91,11 @@
             <div class="split-bar"></div>
             <div class="split-inputs"></div>
           </div>
+          <div class="group-summary" aria-label="สรุปสัดส่วนแบบกลุ่ม">
+            <div class="group-brackets"></div>
+            <div class="group-master-inputs"></div>
+            <p>ลากเพื่อปรับทั้งกลุ่ม · กด Ctrl ค้างเพื่อย้ายจุดเกาะ</p>
+          </div>
           <div class="split-footer">
             <span>รวม</span><strong>100%</strong>
             <button class="text-button remove-point-button" type="button">ลบจุดสุดท้าย</button>
@@ -99,6 +105,6 @@
     </template>
 
     <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script type="module" src="app.js?v=20261125-2"></script>
+    <script type="module" src="app.js?v=20261125-5"></script>
   </body>
 </html>

@@ -9,16 +9,17 @@ export function calculateSummary(price, cost, quantity) {
 }
 
 export function normalizePoints(points) {
+  const round = (value) => Number(value.toFixed(6));
   const sorted = [...points]
-    .map((point) => Math.min(99, Math.max(1, Math.round(Number(point) || 0))))
+    .map((point) => round(Math.min(99.99, Math.max(0.01, Number(point) || 0))))
     .sort((a, b) => a - b);
-  return sorted.filter((point, index) => index === 0 || point > sorted[index - 1]);
+  return sorted.filter((point, index) => index === 0 || point - sorted[index - 1] >= 0.01);
 }
 
 export function pointsToSegments(points) {
   const normalized = normalizePoints(points);
   const edges = [0, ...normalized, 100];
-  return edges.slice(1).map((edge, index) => edge - edges[index]);
+  return edges.slice(1).map((edge, index) => Number((edge - edges[index]).toFixed(6)));
 }
 
 export function addSplitPoint(points) {
@@ -69,12 +70,54 @@ export function movePointWithLocks(points, pointIndex, requestedValue, locks = [
   while (rightIndex < widths.length && locked[rightIndex]) rightIndex += 1;
   if (leftIndex < 0 || rightIndex >= widths.length) return normalized;
 
-  const requestedDelta = Math.round(Number(requestedValue) || 0) - normalized[pointIndex];
-  const delta = Math.min(widths[rightIndex] - 1, Math.max(-(widths[leftIndex] - 1), requestedDelta));
+  const requestedDelta = (Number(requestedValue) || 0) - normalized[pointIndex];
+  const delta = Math.min(widths[rightIndex] - 0.01, Math.max(-(widths[leftIndex] - 0.01), requestedDelta));
   widths[leftIndex] += delta;
   widths[rightIndex] -= delta;
   let runningTotal = 0;
-  return widths.slice(0, -1).map((width) => (runningTotal += width));
+  return widths.slice(0, -1).map((width) => Number((runningTotal += width).toFixed(6)));
+}
+
+export function moveGroupBoundary(points, boundaryIndex, requestedValue, locks = []) {
+  const normalized = normalizePoints(points);
+  if (boundaryIndex < 0 || boundaryIndex >= normalized.length) return normalized;
+  const widths = pointsToSegments(normalized);
+  const split = boundaryIndex + 1;
+  const locked = widths.map((_, index) => Boolean(locks[index]));
+  const leftUnlocked = widths.slice(0, split).some((_, index) => !locked[index]);
+  const rightUnlocked = widths.slice(split).some((_, index) => !locked[index + split]);
+  if (!leftUnlocked || !rightUnlocked) return normalized;
+
+  const minimumForSide = (start, end) => widths.slice(start, end).reduce(
+    (total, width, localIndex) => total + (locked[start + localIndex] ? width : 0.01),
+    0,
+  );
+  const minimumLeft = minimumForSide(0, split);
+  const minimumRight = minimumForSide(split, widths.length);
+  const boundary = Math.min(100 - minimumRight, Math.max(minimumLeft, Number(requestedValue) || 0));
+
+  const scaleSide = (start, end, target) => {
+    const indexes = Array.from({ length: end - start }, (_, index) => start + index);
+    const lockedTotal = indexes.reduce((total, index) => total + (locked[index] ? widths[index] : 0), 0);
+    const unlockedTotal = indexes.reduce((total, index) => total + (!locked[index] ? widths[index] : 0), 0);
+    const available = Math.max(0, target - lockedTotal);
+    indexes.forEach((index) => {
+      if (!locked[index]) widths[index] = available * (widths[index] / unlockedTotal);
+    });
+  };
+
+  scaleSide(0, split, boundary);
+  scaleSide(split, widths.length, 100 - boundary);
+  let runningTotal = 0;
+  return widths.slice(0, -1).map((width) => Number((runningTotal += width).toFixed(6)));
+}
+
+export function snapGroupBoundaryIndex(points, requestedValue) {
+  const normalized = normalizePoints(points);
+  if (!normalized.length) return -1;
+  const target = Number(requestedValue) || 0;
+  return normalized.reduce((nearestIndex, point, index) =>
+    Math.abs(point - target) < Math.abs(normalized[nearestIndex] - target) ? index : nearestIndex, 0);
 }
 
 export function setSegmentAmount(points, segmentIndex, amount, total, locks = []) {
@@ -82,7 +125,7 @@ export function setSegmentAmount(points, segmentIndex, amount, total, locks = []
   const safeTotal = Math.max(0, Number(total) || 0);
   if (!safeTotal || segmentIndex < 0 || segmentIndex > normalized.length) return normalized;
 
-  const targetPercent = Math.min(99, Math.max(1, Math.round((Math.max(0, Number(amount) || 0) / safeTotal) * 100)));
+  const targetPercent = Math.min(99.99, Math.max(0.01, (Math.max(0, Number(amount) || 0) / safeTotal) * 100));
   if (!normalized.length) return normalized;
   const editableLocks = pointsToSegments(normalized).map((_, index) => index === segmentIndex ? false : Boolean(locks[index]));
   const pointIndex = segmentIndex < normalized.length ? segmentIndex : normalized.length - 1;

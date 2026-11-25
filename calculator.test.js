@@ -12,6 +12,8 @@ import {
   sanitizeLayout,
   setSegmentAmount,
   movePointWithLocks,
+  moveGroupBoundary,
+  snapGroupBoundaryIndex,
   parseRoomHash,
   buildRoomHash,
   encodeState,
@@ -38,8 +40,8 @@ test("pointsToSegments converts split points to percentages totaling 100", () =>
   assert.deepEqual(pointsToSegments([25, 70]), [25, 45, 30]);
 });
 
-test("normalizePoints sorts, rounds, and keeps points apart", () => {
-  assert.deepEqual(normalizePoints([90.2, 10.7, 10.9, -4, 140]), [1, 11, 90, 99]);
+test("normalizePoints sorts, preserves decimals, and keeps points apart", () => {
+  assert.deepEqual(normalizePoints([90.2, 10.7, 10.9, -4, 140]), [0.01, 10.7, 10.9, 90.2, 99.99]);
 });
 
 test("addSplitPoint divides the widest segment at its midpoint", () => {
@@ -83,13 +85,42 @@ test("sanitizeLayout accepts supported grid sizes and falls back safely", () => 
 });
 
 test("setSegmentAmount moves the correct boundary from a typed money amount", () => {
-  assert.deepEqual(setSegmentAmount([20, 59], 0, 200, 1200), [17, 59]);
-  assert.deepEqual(setSegmentAmount([20, 59], 1, 200, 1200), [20, 37]);
-  assert.deepEqual(setSegmentAmount([20, 59], 2, 200, 1200), [20, 83]);
+  assert.deepEqual(setSegmentAmount([20, 59], 0, 200, 1200), [16.666667, 59]);
+  assert.deepEqual(setSegmentAmount([20, 59], 1, 200, 1200), [20, 36.666667]);
+  assert.deepEqual(setSegmentAmount([20, 59], 2, 200, 1200), [20, 83.333333]);
 });
 
 test("setSegmentAmount leaves points unchanged when the total is zero", () => {
   assert.deepEqual(setSegmentAmount([20, 59], 0, 200, 0), [20, 59]);
+});
+
+test("setSegmentAmount preserves an exact typed amount that needs a decimal percent", () => {
+  const points = setSegmentAmount([20, 59], 0, 100, 1200);
+  assert.ok(Math.abs(points[0] - 8.333333) < 0.000001);
+  assert.equal(calculateAllocations(1200, points)[0].amount, 100);
+});
+
+test("moveGroupBoundary scales every unlocked segment on both sides proportionally", () => {
+  const points = moveGroupBoundary([16, 29, 50], 1, 40);
+  assert.ok(Math.abs(points[0] - 22.068966) < 0.000001);
+  assert.equal(points[1], 40);
+  assert.ok(Math.abs(points[2] - 57.746479) < 0.000001);
+});
+
+test("moveGroupBoundary keeps locked segment amounts fixed", () => {
+  const points = moveGroupBoundary([16, 29, 50], 1, 40, [true, false, false, false]);
+  assert.equal(points[0], 16);
+  assert.equal(points[1], 40);
+  assert.ok(Math.abs(points[2] - 57.746479) < 0.000001);
+});
+
+test("snapGroupBoundaryIndex selects the existing divider nearest to the Ctrl-drag position", () => {
+  assert.equal(snapGroupBoundaryIndex([10, 32.4, 64.85, 78.29], 61), 2);
+  assert.equal(snapGroupBoundaryIndex([10, 32.4, 64.85, 78.29], 35), 1);
+});
+
+test("snapGroupBoundaryIndex safely falls back when there are no dividers", () => {
+  assert.equal(snapGroupBoundaryIndex([], 50), -1);
 });
 
 test("movePointWithLocks preserves a locked segment and changes the nearest unlocked segments", () => {
@@ -109,7 +140,7 @@ test("movePointWithLocks refuses movement when one side has no unlocked segment"
 test("movePointWithLocks clamps movement before an unlocked segment reaches zero", () => {
   assert.deepEqual(
     movePointWithLocks([20, 50, 70], 0, 50, [false, true, false, false]),
-    [39, 69, 70],
+    [39.99, 69.99, 70],
   );
 });
 
