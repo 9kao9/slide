@@ -36,10 +36,10 @@
 **Interfaces:**
 - Produces: `calculateSummary(price, cost, quantity, packagingCost = 0, shippingCost = 0)`
 
-- [ ] เขียน test ที่ยืนยันว่า 100−40−5−10 คูณ 20 ได้กำไร 900 และ margin 45%
-- [ ] รัน test และยืนยันว่า fail เพราะต้นทุนใหม่ยังไม่ถูกหัก
-- [ ] เพิ่มการ normalize ต้นทุนใหม่และหักจากกำไร
-- [ ] รัน test ทั้งหมดให้ผ่าน
+- [x] เขียน test ที่ยืนยันว่า 100−40−5−10 คูณ 20 ได้กำไร 900 และ margin 45%
+- [x] รัน test และยืนยันว่า fail เพราะต้นทุนใหม่ยังไม่ถูกหัก
+- [x] เพิ่มการ normalize ต้นทุนใหม่และหักจากกำไร
+- [x] รัน test ทั้งหมดให้ผ่าน
 
 ### Task 2: State และข้อมูลเก่า
 
@@ -50,9 +50,9 @@
 - Consumes: `calculateSummary` จาก Task 1
 - Produces: group state ที่มี `packagingCost` และ `shippingCost`
 
-- [ ] เพิ่มค่าเริ่มต้น 0 และ sanitize ฟิลด์ใหม่โดยไม่กระทบ `cost` เดิม
-- [ ] ส่งต้นทุนใหม่เข้า `calculateSummary`; ให้ระบบ persist/share/realtime ใช้ state เดิมที่ขยายแล้ว
-- [ ] ตรวจ syntax และ test suite
+- [x] เพิ่มค่าเริ่มต้น 0 และ sanitize ฟิลด์ใหม่โดยไม่กระทบ `cost` เดิม
+- [x] ส่งต้นทุนใหม่เข้า `calculateSummary`; ให้ระบบ persist/share/realtime ใช้ state เดิมที่ขยายแล้ว
+- [x] ตรวจ syntax และ test suite
 
 ### Task 3: ลำดับช่องบนหน้าจอ
 
@@ -64,8 +64,8 @@
 - Consumes: group state จาก Task 2
 - Produces: 5 slider/input rows ตามลำดับใน spec
 
-- [ ] เปลี่ยนชื่อ `cost` เป็น “ต้นทุนสินค้า/ชิ้น”
-- [ ] เพิ่ม “ค่าบรรจุภัณฑ์/ชิ้น” และ “ค่าขนส่ง/ชิ้น”
-- [ ] ย้าย “ราคาขาย/ชิ้น” ไปก่อน “ยอดขายต่อเดือน”
-- [ ] bump asset version และทดสอบหน้าเว็บกับข้อมูลเก่า
-- [ ] รัน test, syntax check และ `git diff --check`
+- [x] เปลี่ยนชื่อ `cost` เป็น “ต้นทุนสินค้า/ชิ้น”
+- [x] เพิ่ม “ค่าบรรจุภัณฑ์/ชิ้น” และ “ค่าขนส่ง/ชิ้น”
+- [x] ย้าย “ราคาขาย/ชิ้น” ไปก่อน “ยอดขายต่อเดือน”
+- [x] bump asset version และทดสอบหน้าเว็บกับข้อมูลเก่า
+- [x] รัน test, syntax check และ `git diff --check`

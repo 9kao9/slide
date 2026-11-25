@@ -28,6 +28,14 @@ test("calculateSummary returns monthly revenue and gross profit", () => {
   });
 });
 
+test("calculateSummary subtracts product packaging and shipping costs", () => {
+  assert.deepEqual(calculateSummary(100, 40, 20, 5, 10), {
+    revenue: 2000,
+    profit: 900,
+    margin: 45,
+  });
+});
+
 test("calculateSummary clamps invalid negative values to zero", () => {
   assert.deepEqual(calculateSummary(-10, 5, -3), {
     revenue: 0,

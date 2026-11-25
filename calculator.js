@@ -1,9 +1,12 @@
-export function calculateSummary(price, cost, quantity) {
+export function calculateSummary(price, cost, quantity, packagingCost = 0, shippingCost = 0) {
   const safePrice = Math.max(0, Number(price) || 0);
   const safeCost = Math.max(0, Number(cost) || 0);
+  const safePackagingCost = Math.max(0, Number(packagingCost) || 0);
+  const safeShippingCost = Math.max(0, Number(shippingCost) || 0);
   const safeQuantity = Math.max(0, Number(quantity) || 0);
   const revenue = safePrice * safeQuantity;
-  const profit = Math.max(0, safePrice - safeCost) * safeQuantity;
+  const totalUnitCost = safeCost + safePackagingCost + safeShippingCost;
+  const profit = Math.max(0, safePrice - totalUnitCost) * safeQuantity;
   const margin = revenue ? Number(((profit / revenue) * 100).toFixed(2)) : 0;
   return { revenue, profit, margin };
 }

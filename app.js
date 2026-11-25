@@ -1,4 +1,4 @@
-import { addSplitPoint, buildRoomHash, calculateAllocations, calculateSummary, decodeState, encodeState, getDynamicRangeMax, getHandleGradient, moveGroupBoundary, movePointWithLocks, normalizePoints, parseRoomHash, sanitizeLayout, setSegmentAmount, snapGroupBoundaryIndex } from "./calculator.js?v=20261125-4";
+import { addSplitPoint, buildRoomHash, calculateAllocations, calculateSummary, decodeState, encodeState, getDynamicRangeMax, getHandleGradient, moveGroupBoundary, movePointWithLocks, normalizePoints, parseRoomHash, sanitizeLayout, setSegmentAmount, snapGroupBoundaryIndex } from "./calculator.js?v=20261125-8";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./supabase-config.js?v=20261125-2";
 import { createUndoHistory, recordUndoState, undoState } from "./history.js?v=20261125-5";
 
@@ -9,6 +9,8 @@ const defaultGroup = (number = 1) => ({
   name: `Snack Box แผน ${number}`,
   price: 65,
   cost: 35,
+  packagingCost: 0,
+  shippingCost: 0,
   quantity: 3000,
   points: [40],
   allocationTotal: 1200,
@@ -66,6 +68,8 @@ function sanitizeState(candidate) {
         name: String(group.name || `แผน ${index + 1}`).slice(0, 40),
         price: Math.min(100000000, Math.max(0, Number(group.price) || 0)),
         cost: Math.min(100000000, Math.max(0, Number(group.cost) || 0)),
+        packagingCost: Math.min(100000000, Math.max(0, Number(group.packagingCost) || 0)),
+        shippingCost: Math.min(100000000, Math.max(0, Number(group.shippingCost) || 0)),
         quantity: Math.min(100000000, Math.max(0, Number(group.quantity) || 0)),
         layout: sanitizeLayout(group.layout || candidate?.layout),
         points,
@@ -249,7 +253,7 @@ function createSlider(group, key, label, min, max, step, suffix) {
 }
 
 function refreshSummary(card, group) {
-  const result = calculateSummary(group.price, group.cost, group.quantity);
+  const result = calculateSummary(group.price, group.cost, group.quantity, group.packagingCost, group.shippingCost);
   card.querySelector(".revenue-value").textContent = `${formatNumber(result.revenue)} ฿`;
   card.querySelector(".profit-value").textContent = `${formatNumber(result.profit)} ฿`;
   card.querySelector(".margin-value").textContent = `${result.margin}%`;
@@ -488,8 +492,10 @@ function renderCard(group, index) {
 
   const sliders = card.querySelector(".sliders");
   sliders.append(
-    createSlider(group, "price", "ราคาขายต่อชิ้น", 0, 500, 1, "บาท"),
-    createSlider(group, "cost", "ต้นทุนต่อชิ้น", 0, 500, 1, "บาท"),
+    createSlider(group, "cost", "ต้นทุนสินค้า/ชิ้น", 0, 500, 1, "บาท"),
+    createSlider(group, "packagingCost", "ค่าบรรจุภัณฑ์/ชิ้น", 0, 500, 1, "บาท"),
+    createSlider(group, "shippingCost", "ค่าขนส่ง/ชิ้น", 0, 500, 1, "บาท"),
+    createSlider(group, "price", "ราคาขาย/ชิ้น", 0, 500, 1, "บาท"),
     createSlider(group, "quantity", "ยอดขายต่อเดือน", 0, 10000, 50, "ชิ้น"),
   );
   refreshSummary(card, group);
