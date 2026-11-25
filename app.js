@@ -1,4 +1,4 @@
-import { addSplitPoint, buildRoomHash, calculateAllocations, calculateSummary, decodeState, encodeState, getDynamicRangeMax, getHandleGradient, moveGroupBoundary, movePointWithLocks, normalizePoints, parseRoomHash, sanitizeLayout, setSegmentAmount, snapGroupBoundaryIndex } from "./calculator.js?v=20261125-8";
+import { addSplitPoint, buildRoomHash, calculateAllocations, calculateCostSummary, calculateVariableBreakdown, decodeState, encodeState, getDynamicRangeMax, getHandleGradient, moveGroupBoundary, movePointWithLocks, normalizePoints, parseRoomHash, sanitizeCostItems, sanitizeLayout, setSegmentAmount, snapGroupBoundaryIndex } from "./calculator.js?v=20261125-10";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./supabase-config.js?v=20261125-2";
 import { createUndoHistory, recordUndoState, undoState } from "./history.js?v=20261125-5";
 
@@ -8,9 +8,11 @@ const defaultGroup = (number = 1) => ({
   id: crypto.randomUUID(),
   name: `Snack Box แผน ${number}`,
   price: 65,
-  cost: 35,
-  packagingCost: 0,
-  shippingCost: 0,
+  costItems: [
+    { id: crypto.randomUUID(), label: "ต้นทุนสินค้า/ชิ้น", value: 35 },
+    { id: crypto.randomUUID(), label: "ค่าบรรจุภัณฑ์/ชิ้น", value: 0 },
+    { id: crypto.randomUUID(), label: "ค่าขนส่ง/ชิ้น", value: 0 },
+  ],
   quantity: 3000,
   points: [40],
   allocationTotal: 1200,
@@ -67,9 +69,7 @@ function sanitizeState(candidate) {
         id: typeof group.id === "string" ? group.id : crypto.randomUUID(),
         name: String(group.name || `แผน ${index + 1}`).slice(0, 40),
         price: Math.min(100000000, Math.max(0, Number(group.price) || 0)),
-        cost: Math.min(100000000, Math.max(0, Number(group.cost) || 0)),
-        packagingCost: Math.min(100000000, Math.max(0, Number(group.packagingCost) || 0)),
-        shippingCost: Math.min(100000000, Math.max(0, Number(group.shippingCost) || 0)),
+        costItems: sanitizeCostItems(group),
         quantity: Math.min(100000000, Math.max(0, Number(group.quantity) || 0)),
         layout: sanitizeLayout(group.layout || candidate?.layout),
         points,
@@ -252,11 +252,100 @@ function createSlider(group, key, label, min, max, step, suffix) {
   return row;
 }
 
+function createCostSlider(card, group, item, index) {
+  const row = document.createElement("div");
+  row.className = "slider-row cost-row";
+  const dynamicMax = getDynamicRangeMax(item.value, 500);
+  const fill = (item.value / dynamicMax) * 100;
+  row.innerHTML = `
+    <label>
+      <span class="cost-label-wrap"><input class="cost-label-input" maxlength="40" value="" aria-label="ชื่อรายการต้นทุนที่ ${index + 1}" /><button class="remove-cost-button" type="button" aria-label="ลบรายการต้นทุนที่ ${index + 1}" title="ลบแถว">×</button></span>
+      <span class="direct-value"><input type="number" min="0" step="1" value="${item.value}" inputmode="decimal" /><b>บาท</b></span>
+    </label>
+    <input class="single-range" type="range" min="0" max="${dynamicMax}" step="1" value="${item.value}" style="--fill:${fill}%" />
+  `;
+  const labelInput = row.querySelector(".cost-label-input");
+  const numberInput = row.querySelector('input[type="number"]');
+  const rangeInput = row.querySelector('input[type="range"]');
+  labelInput.value = item.label;
+  numberInput.setAttribute("aria-label", `กรอก${item.label}`);
+  rangeInput.setAttribute("aria-label", `เลื่อน${item.label}`);
+  labelInput.addEventListener("input", () => {
+    item.label = labelInput.value.slice(0, 40);
+    numberInput.setAttribute("aria-label", `กรอก${item.label}`);
+    rangeInput.setAttribute("aria-label", `เลื่อน${item.label}`);
+    refreshSummary(card, group);
+    persist();
+  });
+  rangeInput.addEventListener("input", () => {
+    item.value = Number(rangeInput.value);
+    rangeInput.style.setProperty("--fill", `${(item.value / Number(rangeInput.max)) * 100}%`);
+    numberInput.value = item.value;
+    refreshSummary(card, group);
+    persist();
+  });
+  numberInput.addEventListener("input", () => {
+    item.value = Math.min(100000000, Math.max(0, Number(numberInput.value) || 0));
+    const nextMax = getDynamicRangeMax(item.value, 500);
+    rangeInput.max = nextMax;
+    rangeInput.value = item.value;
+    rangeInput.style.setProperty("--fill", `${(item.value / nextMax) * 100}%`);
+    refreshSummary(card, group);
+    persist();
+  });
+  const removeButton = row.querySelector(".remove-cost-button");
+  removeButton.disabled = group.costItems.length === 1;
+  removeButton.addEventListener("click", () => {
+    if (group.costItems.length === 1) return showToast("ต้องมีต้นทุนอย่างน้อย 1 แถว");
+    group.costItems.splice(index, 1);
+    render();
+    persist();
+  });
+  return row;
+}
+
+function renderVariableBreakdown(card, group) {
+  const result = calculateVariableBreakdown(group.price, group.costItems);
+  const labels = card.querySelector(".variable-labels");
+  const bar = card.querySelector(".variable-bar");
+  const status = card.querySelector(".variable-status");
+  labels.replaceChildren();
+  bar.replaceChildren();
+  card.querySelector(".variable-total").textContent = `ราคาขาย 100% · ${formatNumber(group.price)} บาท`;
+  result.segments.forEach((segment, index) => {
+    const color = segment.label === "กำไร" ? "#17212d" : colors[index % colors.length];
+    const label = document.createElement("div");
+    label.className = "variable-label";
+    const dot = document.createElement("i");
+    dot.style.setProperty("--item-color", color);
+    const labelText = document.createElement("span");
+    labelText.textContent = segment.label || `ต้นทุนที่ ${index + 1}`;
+    const labelValue = document.createElement("strong");
+    labelValue.textContent = `${formatPercent(segment.percent)}% · ${formatNumber(segment.value)} บาท`;
+    label.append(dot, labelText, labelValue);
+    labels.append(label);
+    if (segment.barPercent > 0) {
+      const part = document.createElement("div");
+      part.className = "variable-segment";
+      part.style.width = `${segment.barPercent}%`;
+      part.style.backgroundColor = color;
+      part.setAttribute("aria-label", `${segment.label} ${formatPercent(segment.percent)} เปอร์เซ็นต์ ${formatNumber(segment.value)} บาท`);
+      if (segment.barPercent >= 12) part.innerHTML = `<strong>${formatPercent(segment.percent)}%</strong><small>${formatNumber(segment.value)} ฿</small>`;
+      bar.append(part);
+    }
+  });
+  status.classList.toggle("is-loss", result.isLoss);
+  status.textContent = result.isLoss
+    ? `ต้นทุนเกินราคาขาย ${formatNumber(result.loss)} บาท (${group.price ? formatPercent((result.loss / group.price) * 100) : 0}%)`
+    : "แถบนี้คำนวณอัตโนมัติ และไม่เปลี่ยนแปลงส่วนแบ่งอิสระด้านล่าง";
+}
+
 function refreshSummary(card, group) {
-  const result = calculateSummary(group.price, group.cost, group.quantity, group.packagingCost, group.shippingCost);
+  const result = calculateCostSummary(group.price, group.costItems, group.quantity);
   card.querySelector(".revenue-value").textContent = `${formatNumber(result.revenue)} ฿`;
   card.querySelector(".profit-value").textContent = `${formatNumber(result.profit)} ฿`;
   card.querySelector(".margin-value").textContent = `${result.margin}%`;
+  renderVariableBreakdown(card, group);
 }
 
 function renderSplit(card, group) {
@@ -490,24 +579,29 @@ function renderCard(group, index) {
     });
   });
 
-  const sliders = card.querySelector(".sliders");
-  sliders.append(
-    createSlider(group, "cost", "ต้นทุนสินค้า/ชิ้น", 0, 500, 1, "บาท"),
-    createSlider(group, "packagingCost", "ค่าบรรจุภัณฑ์/ชิ้น", 0, 500, 1, "บาท"),
-    createSlider(group, "shippingCost", "ค่าขนส่ง/ชิ้น", 0, 500, 1, "บาท"),
+  const costItems = card.querySelector(".cost-items");
+  costItems.append(...group.costItems.map((item, costIndex) => createCostSlider(card, group, item, costIndex)));
+  const primarySliders = card.querySelector(".primary-sliders");
+  primarySliders.append(
     createSlider(group, "price", "ราคาขาย/ชิ้น", 0, 500, 1, "บาท"),
-    createSlider(group, "quantity", "ยอดขายต่อเดือน", 0, 10000, 50, "ชิ้น"),
+    createSlider(group, "quantity", "ยอดขาย", 0, 10000, 50, "ชิ้น"),
   );
   refreshSummary(card, group);
   renderSplit(card, group);
 
   card.querySelector(".duplicate-button").addEventListener("click", () => update((current) => {
-    const copy = { ...group, id: crypto.randomUUID(), name: `${group.name} (สำเนา)`, points: [...group.points], segmentLabels: [...group.segmentLabels], segmentLocks: [...group.segmentLocks] };
+    const copy = { ...group, id: crypto.randomUUID(), name: `${group.name} (สำเนา)`, costItems: group.costItems.map((item) => ({ ...item, id: crypto.randomUUID() })), points: [...group.points], segmentLabels: [...group.segmentLabels], segmentLocks: [...group.segmentLocks] };
     current.groups.splice(index + 1, 0, copy);
   }));
   card.querySelector(".remove-button").addEventListener("click", () => {
     if (state.groups.length === 1) return showToast("ต้องมีชุดคำนวณอย่างน้อย 1 ชุด");
     update((current) => current.groups.splice(index, 1));
+  });
+  card.querySelector(".add-cost-button").addEventListener("click", () => {
+    if (group.costItems.length >= 12) return showToast("เพิ่มต้นทุนได้สูงสุด 12 แถว");
+    group.costItems.push({ id: crypto.randomUUID(), label: "ต้นทุนเพิ่มเติม/ชิ้น", value: 0 });
+    render();
+    persist();
   });
   card.querySelector(".add-point-button").addEventListener("click", () => {
     if (group.points.length >= 5) return showToast("เพิ่มจุดแบ่งได้สูงสุด 5 จุด");

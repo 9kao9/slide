@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 
 import {
   calculateSummary,
+  calculateCostSummary,
+  calculateVariableBreakdown,
+  sanitizeCostItems,
   normalizePoints,
   pointsToSegments,
   addSplitPoint,
@@ -34,6 +37,75 @@ test("calculateSummary subtracts product packaging and shipping costs", () => {
     profit: 900,
     margin: 45,
   });
+});
+
+test("calculateCostSummary subtracts every flexible cost item", () => {
+  assert.deepEqual(calculateCostSummary(1500, [
+    { label: "ต้นทุนสินค้า/ชิ้น", value: 116 },
+    { label: "ค่าบรรจุภัณฑ์/ชิ้น", value: 20 },
+    { label: "ค่าขนส่ง/ชิ้น", value: 0 },
+  ], 1), {
+    revenue: 1500,
+    profit: 1364,
+    margin: 90.93,
+    totalUnitCost: 136,
+  });
+});
+
+test("calculateVariableBreakdown uses sale price as 100 percent", () => {
+  assert.deepEqual(calculateVariableBreakdown(1500, [
+    { label: "ต้นทุนสินค้า/ชิ้น", value: 116 },
+    { label: "ค่าบรรจุภัณฑ์/ชิ้น", value: 20 },
+  ]), {
+    segments: [
+      { label: "ต้นทุนสินค้า/ชิ้น", value: 116, percent: 7.73, barPercent: 7.733333333333333 },
+      { label: "ค่าบรรจุภัณฑ์/ชิ้น", value: 20, percent: 1.33, barPercent: 1.3333333333333335 },
+      { label: "กำไร", value: 1364, percent: 90.93, barPercent: 90.93333333333334 },
+    ],
+    loss: 0,
+    isLoss: false,
+  });
+});
+
+test("calculateVariableBreakdown stays finite at zero price", () => {
+  assert.deepEqual(calculateVariableBreakdown(0, [{ label: "ต้นทุน", value: 50 }]), {
+    segments: [{ label: "ต้นทุน", value: 50, percent: 0, barPercent: 100 }],
+    loss: 50,
+    isLoss: true,
+  });
+});
+
+test("calculateVariableBreakdown scales an over-budget bar without hiding actual percentages", () => {
+  assert.deepEqual(calculateVariableBreakdown(100, [
+    { label: "สินค้า", value: 80 },
+    { label: "ขนส่ง", value: 40 },
+  ]), {
+    segments: [
+      { label: "สินค้า", value: 80, percent: 80, barPercent: 66.66666666666666 },
+      { label: "ขนส่ง", value: 40, percent: 40, barPercent: 33.33333333333333 },
+    ],
+    loss: 20,
+    isLoss: true,
+  });
+});
+
+test("sanitizeCostItems migrates the three legacy cost fields", () => {
+  assert.deepEqual(sanitizeCostItems({ cost: 116, packagingCost: 20, shippingCost: 7 }), [
+    { id: "legacy-product", label: "ต้นทุนสินค้า/ชิ้น", value: 116 },
+    { id: "legacy-packaging", label: "ค่าบรรจุภัณฑ์/ชิ้น", value: 20 },
+    { id: "legacy-shipping", label: "ค่าขนส่ง/ชิ้น", value: 7 },
+  ]);
+});
+
+test("sanitizeCostItems cleans flexible items and keeps at least one row", () => {
+  assert.deepEqual(sanitizeCostItems({ costItems: [
+    { id: "one", label: "  ค่าแรง  ", value: -5 },
+    { id: "two", label: "", value: 25 },
+  ] }), [
+    { id: "one", label: "ค่าแรง", value: 0 },
+    { id: "two", label: "ต้นทุนที่ 2/ชิ้น", value: 25 },
+  ]);
+  assert.ok(sanitizeCostItems({ costItems: [] }).length >= 1);
 });
 
 test("calculateSummary clamps invalid negative values to zero", () => {

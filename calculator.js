@@ -11,6 +11,52 @@ export function calculateSummary(price, cost, quantity, packagingCost = 0, shipp
   return { revenue, profit, margin };
 }
 
+export function calculateCostSummary(price, costItems, quantity) {
+  const safeItems = Array.isArray(costItems) ? costItems : [];
+  const totalUnitCost = safeItems.reduce((total, item) => total + Math.max(0, Number(item?.value) || 0), 0);
+  const summary = calculateSummary(price, totalUnitCost, quantity);
+  return { ...summary, totalUnitCost };
+}
+
+export function calculateVariableBreakdown(price, costItems) {
+  const safePrice = Math.max(0, Number(price) || 0);
+  const safeItems = (Array.isArray(costItems) ? costItems : []).map((item, index) => ({
+    label: String(item?.label || `ต้นทุนที่ ${index + 1}`),
+    value: Math.max(0, Number(item?.value) || 0),
+  }));
+  const totalCost = safeItems.reduce((total, item) => total + item.value, 0);
+  const loss = Math.max(0, totalCost - safePrice);
+  const isLoss = loss > 0 || (safePrice === 0 && totalCost > 0);
+  const profit = Math.max(0, safePrice - totalCost);
+  const visualTotal = isLoss ? totalCost : safePrice;
+  const toSegment = (item) => ({
+    ...item,
+    percent: safePrice ? Number(((item.value / safePrice) * 100).toFixed(2)) : 0,
+    barPercent: visualTotal ? (item.value / visualTotal) * 100 : 0,
+  });
+  const segments = safeItems.map(toSegment);
+  if (!isLoss && profit > 0) segments.push(toSegment({ label: "กำไร", value: profit }));
+  return { segments, loss, isLoss };
+}
+
+export function sanitizeCostItems(group) {
+  const supplied = Array.isArray(group?.costItems) && group.costItems.length
+    ? group.costItems
+    : [
+        { id: "legacy-product", label: "ต้นทุนสินค้า/ชิ้น", value: group?.cost },
+        { id: "legacy-packaging", label: "ค่าบรรจุภัณฑ์/ชิ้น", value: group?.packagingCost },
+        { id: "legacy-shipping", label: "ค่าขนส่ง/ชิ้น", value: group?.shippingCost },
+      ];
+  return supplied.slice(0, 12).map((item, index) => {
+    const label = String(item?.label || "").trim().slice(0, 40) || `ต้นทุนที่ ${index + 1}/ชิ้น`;
+    return {
+      id: typeof item?.id === "string" && item.id ? item.id : `cost-${index + 1}`,
+      label,
+      value: Math.min(100000000, Math.max(0, Number(item?.value) || 0)),
+    };
+  });
+}
+
 export function normalizePoints(points) {
   const round = (value) => Number(value.toFixed(6));
   const sorted = [...points]

@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Kanit:wght@500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=20261125-8" />
+    <link rel="stylesheet" href="styles.css?v=20261125-10" />
   </head>
   <body>
     <header class="topbar">
@@ -69,17 +69,34 @@
           </div>
         </div>
 
-        <div class="sliders"></div>
+        <div class="sliders">
+          <div class="costs-heading">
+            <strong>ต้นทุนต่อชิ้น</strong>
+            <button class="mini-button add-cost-button" type="button">＋ เพิ่มแถว</button>
+          </div>
+          <div class="cost-items"></div>
+          <div class="primary-sliders"></div>
+        </div>
 
         <div class="summary" aria-live="polite">
-          <div><span>ยอดขายต่อเดือน</span><strong class="revenue-value"></strong></div>
-          <div><span>กำไรขั้นต้นต่อเดือน</span><strong class="profit-value"></strong></div>
+          <div><span>ยอดขาย</span><strong class="revenue-value"></strong></div>
+          <div><span>กำไรขั้นต้น</span><strong class="profit-value"></strong></div>
           <div><span>อัตรากำไร</span><strong class="margin-value"></strong></div>
+        </div>
+
+        <div class="variable-section">
+          <div class="variable-heading">
+            <div><h3>แบ่งสัดส่วนแปรผันตาม</h3><p>คำนวณอัตโนมัติจากราคาขายและต้นทุนด้านบน</p></div>
+            <strong class="variable-total"></strong>
+          </div>
+          <div class="variable-labels"></div>
+          <div class="variable-bar" aria-label="สัดส่วนต้นทุนและกำไรเทียบกับราคาขาย"></div>
+          <p class="variable-status"></p>
         </div>
 
         <div class="split-section">
           <div class="split-heading">
-            <div><h3>แบ่งสัดส่วน</h3><p>ลากจุดเพื่อกำหนดเปอร์เซ็นต์แต่ละส่วน</p></div>
+            <div><h3>แบ่งสัดส่วน (อิสระ)</h3><p>ลากจุดเพื่อกำหนดเปอร์เซ็นต์แต่ละส่วน โดยไม่ผูกกับข้อมูลด้านบน</p></div>
             <button class="mini-button add-point-button" type="button">＋ เพิ่มจุดแบ่ง</button>
           </div>
           <label class="allocation-total">
@@ -105,6 +122,6 @@
     </template>
 
     <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script type="module" src="app.js?v=20261125-9"></script>
+    <script type="module" src="app.js?v=20261125-10"></script>
   </body>
 </html>
