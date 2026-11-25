@@ -313,9 +313,10 @@ function renderVariableBreakdown(card, group) {
   bar.replaceChildren();
   card.querySelector(".variable-total").textContent = `ราคาขาย 100% · ${formatNumber(group.price)} บาท`;
   result.segments.forEach((segment, index) => {
-    const color = segment.label === "กำไร" ? "#17212d" : colors[index % colors.length];
+    const isProfit = segment.label === "กำไร";
+    const color = isProfit ? "#3c9f70" : colors[index % colors.length];
     const label = document.createElement("div");
-    label.className = "variable-label";
+    label.className = `variable-label${isProfit ? " is-profit" : ""}`;
     const dot = document.createElement("i");
     dot.style.setProperty("--item-color", color);
     const labelText = document.createElement("span");

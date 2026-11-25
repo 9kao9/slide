@@ -120,6 +120,7 @@ input[type="range"]:active { cursor: grabbing; }
 .summary span { color: var(--muted); display: block; font-size: .72rem; margin-bottom: 2px; }
 .summary strong { font-family: Kanit, sans-serif; font-size: clamp(1.05rem, 2vw, 1.43rem); white-space: nowrap; }
 .summary > div:nth-child(2) strong { color: var(--green); }
+.summary > div:nth-child(3) strong { color: var(--green); }
 
 .variable-section { margin: 22px 24px 0; padding: 18px; border: 1px solid #d8e5ef; border-radius: 13px; background: #f7fbfe; }
 .variable-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
@@ -131,6 +132,7 @@ input[type="range"]:active { cursor: grabbing; }
 .variable-label i { width: 8px; height: 8px; border-radius: 50%; background: var(--item-color); }
 .variable-label span { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .variable-label strong { color: var(--ink); white-space: nowrap; }
+.variable-label.is-profit strong { color: var(--green); }
 .variable-bar { width: 100%; min-height: 42px; display: flex; overflow: hidden; border-radius: 9px; background: #e7ebee; }
 .variable-segment { min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; color: white; line-height: 1.05; text-shadow: 0 1px 2px rgba(0,0,0,.2); }
 .variable-segment strong, .variable-segment small { white-space: nowrap; }
