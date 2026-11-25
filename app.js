@@ -1,5 +1,5 @@
-import { addSplitPoint, buildRoomHash, calculateAllocations, calculateSummary, decodeState, encodeState, getDynamicRangeMax, getHandleGradient, movePointWithLocks, normalizePoints, parseRoomHash, sanitizeLayout, setSegmentAmount } from "./calculator.js";
-import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./supabase-config.js";
+import { addSplitPoint, buildRoomHash, calculateAllocations, calculateSummary, decodeState, encodeState, getDynamicRangeMax, getHandleGradient, movePointWithLocks, normalizePoints, parseRoomHash, sanitizeLayout, setSegmentAmount } from "./calculator.js?v=20261125-2";
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./supabase-config.js?v=20261125-2";
 
 const STORAGE_KEY = "slider-business-calculator-v1";
 const colors = ["#2787d8", "#ee7042", "#3c9f70", "#806bb5", "#d39d27", "#3b8490"];
