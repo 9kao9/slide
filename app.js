@@ -1,4 +1,4 @@
-import { addSplitPoint, calculateAllocations, calculateSummary, decodeState, encodeState, getDynamicRangeMax, getHandleGradient, normalizePoints, sanitizeLayout } from "./calculator.js";
+import { addSplitPoint, calculateAllocations, calculateSummary, decodeState, encodeState, getDynamicRangeMax, getHandleGradient, movePointWithLocks, normalizePoints, sanitizeLayout, setSegmentAmount } from "./calculator.js";
 
 const STORAGE_KEY = "slider-business-calculator-v1";
 const colors = ["#2787d8", "#ee7042", "#3c9f70", "#806bb5", "#d39d27", "#3b8490"];
@@ -11,6 +11,7 @@ const defaultGroup = (number = 1) => ({
   points: [40],
   allocationTotal: 1200,
   segmentLabels: ["COGS", "กำไร"],
+  segmentLocks: [false, false],
 });
 
 const sharedState = new URLSearchParams(location.search).get("share");
@@ -31,6 +32,7 @@ function sanitizeState(candidate) {
     groups: groups.slice(0, 12).map((group, index) => {
       const points = normalizePoints(Array.isArray(group.points) ? group.points : [50]).slice(0, 5);
       const suppliedLabels = Array.isArray(group.segmentLabels) ? group.segmentLabels : [];
+      const suppliedLocks = Array.isArray(group.segmentLocks) ? group.segmentLocks : [];
       return {
         id: typeof group.id === "string" ? group.id : crypto.randomUUID(),
         name: String(group.name || `แผน ${index + 1}`).slice(0, 40),
@@ -43,6 +45,7 @@ function sanitizeState(candidate) {
         segmentLabels: Array.from({ length: points.length + 1 }, (_, labelIndex) =>
           String(suppliedLabels[labelIndex] || `ส่วนที่ ${labelIndex + 1}`).slice(0, 24),
         ),
+        segmentLocks: Array.from({ length: points.length + 1 }, (_, lockIndex) => Boolean(suppliedLocks[lockIndex])),
       };
     }),
   };
@@ -135,7 +138,7 @@ function renderSplit(card, group) {
   };
 
   allocations.forEach(({ percent, amount }, index) => {
-    const nameWrap = document.createElement("label");
+    const nameWrap = document.createElement("div");
     nameWrap.className = "segment-name";
     nameWrap.style.width = `${percent}%`;
     nameWrap.style.setProperty("--segment-color", colors[index % colors.length]);
@@ -148,7 +151,40 @@ function renderSplit(card, group) {
       group.segmentLabels[index] = nameInput.value;
       persist();
     });
-    nameWrap.append(nameInput);
+    const lockButton = document.createElement("button");
+    const refreshLockButton = () => {
+      const isLocked = group.segmentLocks[index];
+      lockButton.textContent = isLocked ? "🔒" : "🔓";
+      lockButton.setAttribute("aria-pressed", String(isLocked));
+      lockButton.setAttribute("aria-label", `${isLocked ? "ปลดล็อก" : "ล็อก"}${group.segmentLabels[index]}`);
+      lockButton.title = isLocked ? "ปลดล็อกค่านี้" : "ล็อกค่านี้ไม่ให้เปลี่ยนตามจุดอื่น";
+    };
+    lockButton.type = "button";
+    lockButton.className = "segment-lock";
+    lockButton.addEventListener("click", () => {
+      group.segmentLocks[index] = !group.segmentLocks[index];
+      refreshLockButton();
+      persist();
+    });
+    refreshLockButton();
+    const amountLabel = document.createElement("label");
+    amountLabel.className = "segment-amount";
+    const amountInput = document.createElement("input");
+    amountInput.type = "number";
+    amountInput.min = "0";
+    amountInput.step = "1";
+    amountInput.inputMode = "decimal";
+    amountInput.value = amount;
+    amountInput.setAttribute("aria-label", `จำนวนเงินของ${group.segmentLabels[index]}`);
+    amountInput.addEventListener("change", () => {
+      group.points = setSegmentAmount(group.points, index, amountInput.value, group.allocationTotal, group.segmentLocks);
+      renderSplit(card, group);
+      persist();
+    });
+    const baht = document.createElement("span");
+    baht.textContent = "฿";
+    amountLabel.append(amountInput, baht);
+    nameWrap.append(nameInput, lockButton, amountLabel);
     names.append(nameWrap);
 
     const segment = document.createElement("div");
@@ -164,16 +200,14 @@ function renderSplit(card, group) {
 
   group.points.forEach((point, pointIndex) => {
     const input = document.createElement("input");
-    const previous = pointIndex === 0 ? 1 : group.points[pointIndex - 1] + 1;
-    const next = pointIndex === group.points.length - 1 ? 99 : group.points[pointIndex + 1] - 1;
     input.type = "range";
-    input.min = previous;
-    input.max = next;
+    input.min = 1;
+    input.max = 99;
     input.value = point;
     input.style.setProperty("--handle-color", getHandleGradient(pointIndex, colors));
     input.setAttribute("aria-label", `จุดแบ่งที่ ${pointIndex + 1}`);
     input.addEventListener("input", () => {
-      group.points[pointIndex] = Number(input.value);
+      group.points = movePointWithLocks(group.points, pointIndex, Number(input.value), group.segmentLocks);
       const liveSegments = calculateAllocations(group.allocationTotal, group.points);
       [...bar.children].forEach((segment, segmentIndex) => {
         const { percent, amount } = liveSegments[segmentIndex];
@@ -183,6 +217,9 @@ function renderSplit(card, group) {
           : `<strong>${percent}%</strong>`;
         segment.setAttribute("aria-label", `${group.segmentLabels[segmentIndex]} ${percent} เปอร์เซ็นต์ ${formatNumber(amount)} บาท`);
         names.children[segmentIndex].style.width = `${percent}%`;
+      });
+      [...inputs.children].forEach((pointInput, inputIndex) => {
+        pointInput.value = group.points[inputIndex];
       });
       persist();
     });
@@ -224,7 +261,7 @@ function renderCard(group, index) {
   renderSplit(card, group);
 
   card.querySelector(".duplicate-button").addEventListener("click", () => update((current) => {
-    const copy = { ...group, id: crypto.randomUUID(), name: `${group.name} (สำเนา)`, points: [...group.points], segmentLabels: [...group.segmentLabels] };
+    const copy = { ...group, id: crypto.randomUUID(), name: `${group.name} (สำเนา)`, points: [...group.points], segmentLabels: [...group.segmentLabels], segmentLocks: [...group.segmentLocks] };
     current.groups.splice(index + 1, 0, copy);
   }));
   card.querySelector(".remove-button").addEventListener("click", () => {
@@ -235,12 +272,14 @@ function renderCard(group, index) {
     if (group.points.length >= 5) return showToast("เพิ่มจุดแบ่งได้สูงสุด 5 จุด");
     group.points = addSplitPoint(group.points);
     group.segmentLabels.push(`ส่วนที่ ${group.segmentLabels.length + 1}`);
+    group.segmentLocks = Array(group.points.length + 1).fill(false);
     renderSplit(card, group);
     persist();
   });
   card.querySelector(".remove-point-button").addEventListener("click", () => {
     group.points.pop();
     group.segmentLabels.pop();
+    group.segmentLocks.pop();
     renderSplit(card, group);
     persist();
   });

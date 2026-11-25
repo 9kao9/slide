@@ -58,6 +58,39 @@ export function sanitizeLayout(layout) {
   return ["full", "halves", "thirds"].includes(layout) ? layout : "thirds";
 }
 
+export function movePointWithLocks(points, pointIndex, requestedValue, locks = []) {
+  const normalized = normalizePoints(points);
+  if (pointIndex < 0 || pointIndex >= normalized.length) return normalized;
+  const widths = pointsToSegments(normalized);
+  const locked = widths.map((_, index) => Boolean(locks[index]));
+  let leftIndex = pointIndex;
+  while (leftIndex >= 0 && locked[leftIndex]) leftIndex -= 1;
+  let rightIndex = pointIndex + 1;
+  while (rightIndex < widths.length && locked[rightIndex]) rightIndex += 1;
+  if (leftIndex < 0 || rightIndex >= widths.length) return normalized;
+
+  const requestedDelta = Math.round(Number(requestedValue) || 0) - normalized[pointIndex];
+  const delta = Math.min(widths[rightIndex] - 1, Math.max(-(widths[leftIndex] - 1), requestedDelta));
+  widths[leftIndex] += delta;
+  widths[rightIndex] -= delta;
+  let runningTotal = 0;
+  return widths.slice(0, -1).map((width) => (runningTotal += width));
+}
+
+export function setSegmentAmount(points, segmentIndex, amount, total, locks = []) {
+  const normalized = normalizePoints(points);
+  const safeTotal = Math.max(0, Number(total) || 0);
+  if (!safeTotal || segmentIndex < 0 || segmentIndex > normalized.length) return normalized;
+
+  const targetPercent = Math.min(99, Math.max(1, Math.round((Math.max(0, Number(amount) || 0) / safeTotal) * 100)));
+  if (!normalized.length) return normalized;
+  const editableLocks = pointsToSegments(normalized).map((_, index) => index === segmentIndex ? false : Boolean(locks[index]));
+  const pointIndex = segmentIndex < normalized.length ? segmentIndex : normalized.length - 1;
+  const leftEdge = segmentIndex === 0 ? 0 : normalized[segmentIndex - 1];
+  const requestedBoundary = segmentIndex < normalized.length ? leftEdge + targetPercent : 100 - targetPercent;
+  return movePointWithLocks(normalized, pointIndex, requestedBoundary, editableLocks);
+}
+
 export function encodeState(state) {
   const utf8 = encodeURIComponent(JSON.stringify(state)).replace(/%([0-9A-F]{2})/g, (_, hex) =>
     String.fromCharCode(Number.parseInt(hex, 16)),

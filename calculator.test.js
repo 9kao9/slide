@@ -10,6 +10,8 @@ import {
   calculateAllocations,
   getDynamicRangeMax,
   sanitizeLayout,
+  setSegmentAmount,
+  movePointWithLocks,
   encodeState,
   decodeState,
 } from "./calculator.js";
@@ -76,6 +78,37 @@ test("sanitizeLayout accepts supported grid sizes and falls back safely", () => 
   assert.equal(sanitizeLayout("thirds"), "thirds");
   assert.equal(sanitizeLayout("quarters"), "thirds");
   assert.equal(sanitizeLayout("unknown"), "thirds");
+});
+
+test("setSegmentAmount moves the correct boundary from a typed money amount", () => {
+  assert.deepEqual(setSegmentAmount([20, 59], 0, 200, 1200), [17, 59]);
+  assert.deepEqual(setSegmentAmount([20, 59], 1, 200, 1200), [20, 37]);
+  assert.deepEqual(setSegmentAmount([20, 59], 2, 200, 1200), [20, 83]);
+});
+
+test("setSegmentAmount leaves points unchanged when the total is zero", () => {
+  assert.deepEqual(setSegmentAmount([20, 59], 0, 200, 0), [20, 59]);
+});
+
+test("movePointWithLocks preserves a locked segment and changes the nearest unlocked segments", () => {
+  assert.deepEqual(
+    movePointWithLocks([20, 50, 70], 0, 30, [false, true, false, false]),
+    [30, 60, 70],
+  );
+});
+
+test("movePointWithLocks refuses movement when one side has no unlocked segment", () => {
+  assert.deepEqual(
+    movePointWithLocks([20, 50], 0, 30, [false, true, true]),
+    [20, 50],
+  );
+});
+
+test("movePointWithLocks clamps movement before an unlocked segment reaches zero", () => {
+  assert.deepEqual(
+    movePointWithLocks([20, 50, 70], 0, 50, [false, true, false, false]),
+    [39, 69, 70],
+  );
 });
 
 test("state can be encoded into and decoded from a share link", () => {
