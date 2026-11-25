@@ -1,4 +1,5 @@
-import { addSplitPoint, calculateAllocations, calculateSummary, decodeState, encodeState, getDynamicRangeMax, getHandleGradient, movePointWithLocks, normalizePoints, sanitizeLayout, setSegmentAmount } from "./calculator.js";
+import { addSplitPoint, buildRoomHash, calculateAllocations, calculateSummary, decodeState, encodeState, getDynamicRangeMax, getHandleGradient, movePointWithLocks, normalizePoints, parseRoomHash, sanitizeLayout, setSegmentAmount } from "./calculator.js";
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./supabase-config.js";
 
 const STORAGE_KEY = "slider-business-calculator-v1";
 const colors = ["#2787d8", "#ee7042", "#3c9f70", "#806bb5", "#d39d27", "#3b8490"];
@@ -19,6 +20,12 @@ const fromLink = sharedState ? decodeState(sharedState) : null;
 const fromStorage = decodeState(localStorage.getItem(STORAGE_KEY) || "");
 let state = sanitizeState(fromLink || fromStorage || { groups: [defaultGroup()] });
 const channel = "BroadcastChannel" in window ? new BroadcastChannel("slider-business-calculator") : null;
+let roomCredentials = parseRoomHash(location.hash);
+let supabaseClient = null;
+let remoteChannel = null;
+let remoteReady = false;
+let remoteSaveTimer = null;
+const clientId = crypto.randomUUID();
 
 const grid = document.querySelector("#calculatorGrid");
 const template = document.querySelector("#calculatorTemplate");
@@ -56,7 +63,83 @@ function persist(broadcast = true) {
   saveStatus.textContent = "บันทึกแล้ว";
   clearTimeout(persist.timer);
   persist.timer = setTimeout(() => (saveStatus.textContent = "บันทึกอัตโนมัติ"), 1200);
-  if (broadcast) channel?.postMessage(state);
+  if (broadcast && !roomCredentials) channel?.postMessage(state);
+  queueRemoteSync();
+}
+
+async function saveRemoteState() {
+  if (!roomCredentials || !supabaseClient) return false;
+  const { data, error } = await supabaseClient.rpc("save_live_room", {
+    p_room_id: roomCredentials.room,
+    p_edit_key: roomCredentials.key,
+    p_state: state,
+  });
+  if (error || data === false) {
+    saveStatus.textContent = "บันทึกออนไลน์ไม่สำเร็จ";
+    return false;
+  }
+  saveStatus.textContent = "ออนไลน์ • บันทึกแล้ว";
+  return true;
+}
+
+function queueRemoteSync() {
+  if (!roomCredentials || !supabaseClient) return;
+  if (remoteReady && remoteChannel) {
+    remoteChannel.send({
+      type: "broadcast",
+      event: "state-update",
+      payload: { sender: clientId, state },
+    });
+  }
+  clearTimeout(remoteSaveTimer);
+  remoteSaveTimer = setTimeout(saveRemoteState, 350);
+}
+
+async function initializeRealtime({ createIfMissing = false } = {}) {
+  if (!roomCredentials || !window.supabase?.createClient) return false;
+  if (remoteChannel) await supabaseClient.removeChannel(remoteChannel);
+  saveStatus.textContent = "กำลังเชื่อมต่อห้องสด…";
+  supabaseClient ||= window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+
+  const { data, error } = await supabaseClient.rpc("load_live_room", {
+    p_room_id: roomCredentials.room,
+    p_edit_key: roomCredentials.key,
+  });
+  if (error) {
+    saveStatus.textContent = "เชื่อมต่อออนไลน์ไม่สำเร็จ";
+    showToast(`เชื่อมต่อห้องสดไม่สำเร็จ: ${error.message}`);
+    return false;
+  }
+  if (data) {
+    state = sanitizeState(data);
+    localStorage.setItem(STORAGE_KEY, encodeState(state));
+    render();
+  } else if (createIfMissing) {
+    const saved = await saveRemoteState();
+    if (!saved) return false;
+  } else {
+    showToast("ไม่พบห้องนี้ หรือลิงก์ไม่ถูกต้อง");
+    return false;
+  }
+
+  const topic = `room:${roomCredentials.room}:${roomCredentials.key}`;
+  remoteChannel = supabaseClient
+    .channel(topic)
+    .on("broadcast", { event: "state-update" }, ({ payload }) => {
+      if (!payload?.state || payload.sender === clientId) return;
+      state = sanitizeState(payload.state);
+      localStorage.setItem(STORAGE_KEY, encodeState(state));
+      render();
+      saveStatus.textContent = "ออนไลน์ • อัปเดตสด";
+    })
+    .subscribe((status) => {
+      remoteReady = status === "SUBSCRIBED";
+      if (remoteReady) saveStatus.textContent = "ออนไลน์ • ซิงก์สด";
+      if (["CHANNEL_ERROR", "TIMED_OUT"].includes(status)) saveStatus.textContent = "การเชื่อมต่อสดขัดข้อง";
+    });
+  return true;
 }
 
 function update(mutator, shouldRender = true) {
@@ -299,18 +382,27 @@ document.querySelector("#addGroupButton").addEventListener("click", () => {
 
 document.querySelector("#shareButton").addEventListener("click", async () => {
   const url = new URL(location.href);
-  url.search = "";
-  url.searchParams.set("share", encodeState(state));
+  url.searchParams.delete("share");
+  if (!roomCredentials) {
+    roomCredentials = { room: crypto.randomUUID(), key: crypto.randomUUID() };
+    url.hash = buildRoomHash(roomCredentials.room, roomCredentials.key);
+    history.replaceState(null, "", url);
+    const connected = await initializeRealtime({ createIfMissing: true });
+    if (!connected) return;
+  } else {
+    url.hash = buildRoomHash(roomCredentials.room, roomCredentials.key);
+  }
   try {
     await navigator.clipboard.writeText(url.toString());
-    showToast("คัดลอกลิงก์แล้ว ส่งให้คนอื่นเปิดดูได้เลย");
+    showToast("คัดลอกลิงก์ห้องสดแล้ว ทุกคนในลิงก์นี้จะเห็นพร้อมกัน");
   } catch {
     history.replaceState(null, "", url);
-    showToast("สร้างลิงก์แชร์แล้ว คัดลอกจากแถบที่อยู่ได้เลย");
+    showToast("สร้างห้องสดแล้ว คัดลอกลิงก์จากแถบที่อยู่ได้เลย");
   }
 });
 
 channel?.addEventListener("message", (event) => {
+  if (roomCredentials) return;
   state = sanitizeState(event.data);
   localStorage.setItem(STORAGE_KEY, encodeState(state));
   render();
@@ -319,3 +411,4 @@ channel?.addEventListener("message", (event) => {
 
 if (fromLink) showToast("โหลดค่าจากลิงก์ที่แชร์แล้ว");
 render();
+if (roomCredentials) initializeRealtime();

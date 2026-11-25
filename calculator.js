@@ -91,6 +91,19 @@ export function setSegmentAmount(points, segmentIndex, amount, total, locks = []
   return movePointWithLocks(normalized, pointIndex, requestedBoundary, editableLocks);
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function buildRoomHash(room, key) {
+  return `#${new URLSearchParams({ room, key }).toString()}`;
+}
+
+export function parseRoomHash(hash) {
+  const params = new URLSearchParams(String(hash || "").replace(/^#/, ""));
+  const room = params.get("room");
+  const key = params.get("key");
+  return UUID_PATTERN.test(room || "") && UUID_PATTERN.test(key || "") ? { room, key } : null;
+}
+
 export function encodeState(state) {
   const utf8 = encodeURIComponent(JSON.stringify(state)).replace(/%([0-9A-F]{2})/g, (_, hex) =>
     String.fromCharCode(Number.parseInt(hex, 16)),

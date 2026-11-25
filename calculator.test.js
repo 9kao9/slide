@@ -12,6 +12,8 @@ import {
   sanitizeLayout,
   setSegmentAmount,
   movePointWithLocks,
+  parseRoomHash,
+  buildRoomHash,
   encodeState,
   decodeState,
 } from "./calculator.js";
@@ -109,6 +111,17 @@ test("movePointWithLocks clamps movement before an unlocked segment reaches zero
     movePointWithLocks([20, 50, 70], 0, 50, [false, true, false, false]),
     [39, 69, 70],
   );
+});
+
+test("room credentials round-trip through a URL hash", () => {
+  const room = "123e4567-e89b-42d3-a456-426614174000";
+  const key = "123e4567-e89b-42d3-a456-426614174111";
+  assert.deepEqual(parseRoomHash(buildRoomHash(room, key)), { room, key });
+});
+
+test("parseRoomHash rejects missing or invalid room credentials", () => {
+  assert.equal(parseRoomHash("#room=bad&key=test"), null);
+  assert.equal(parseRoomHash("#room=123e4567-e89b-42d3-a456-426614174000"), null);
 });
 
 test("state can be encoded into and decoded from a share link", () => {
