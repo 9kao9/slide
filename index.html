@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f6f8" />
+    <meta name="description" content="เครื่องคำนวณยอดขาย กำไร และแบ่งสัดส่วนแบบเลื่อนได้" />
+    <title>เลื่อนคิด — เครื่องคำนวณธุรกิจ</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Kanit:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css?v=20261125-2" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="หน้าแรก เลื่อนคิด">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>เลื่อนคิด</span>
+      </a>
+      <div class="header-actions">
+        <span class="save-status" id="saveStatus" role="status">บันทึกอัตโนมัติ</span>
+        <button class="button button-secondary" id="shareButton" type="button">
+          <span aria-hidden="true">↗</span> <span class="share-label">แชร์หน้านี้</span>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="pageTitle">
+        <div>
+          <p class="eyebrow">เครื่องมือวางแผนธุรกิจ</p>
+          <h1 id="pageTitle">เลื่อนตัวเลข<br /><span>เห็นคำตอบทันที</span></h1>
+        </div>
+        <p class="hero-copy">ลองปรับราคา ต้นทุน และยอดขาย สร้างหลายชุดไว้เทียบกัน แล้วแบ่งสัดส่วนบนแถบเดียวได้ตามต้องการ</p>
+      </section>
+
+      <section class="workspace" aria-label="ชุดเครื่องคำนวณ">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">ชุดคำนวณของคุณ</p>
+            <h2>เปรียบเทียบทุกแผนในหน้าเดียว</h2>
+          </div>
+          <div class="workspace-actions">
+            <button class="button button-primary" id="addGroupButton" type="button"><span aria-hidden="true">＋</span> เพิ่มชุดคำนวณ</button>
+          </div>
+        </div>
+        <div class="calculator-grid" id="calculatorGrid"></div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <template id="calculatorTemplate">
+      <article class="calculator-card">
+        <div class="card-head">
+          <div class="card-title-wrap">
+            <span class="card-index"></span>
+            <input class="card-title" aria-label="ชื่อชุดคำนวณ" maxlength="40" />
+          </div>
+          <div class="card-actions">
+            <div class="card-layout-picker" role="group" aria-label="ขนาดของชุดคำนวณนี้">
+              <button type="button" data-card-layout="thirds" aria-pressed="false" title="ขนาด 1/3">1/3</button>
+              <button type="button" data-card-layout="halves" aria-pressed="false" title="ขนาด 1/2">1/2</button>
+              <button type="button" data-card-layout="full" aria-pressed="false" title="เต็มหน้า">เต็ม</button>
+            </div>
+            <button class="icon-button duplicate-button" type="button" aria-label="ทำสำเนาชุดนี้" title="ทำสำเนา">⧉</button>
+            <button class="icon-button remove-button" type="button" aria-label="ลบชุดนี้" title="ลบ">×</button>
+          </div>
+        </div>
+
+        <div class="sliders"></div>
+
+        <div class="summary" aria-live="polite">
+          <div><span>ยอดขายต่อเดือน</span><strong class="revenue-value"></strong></div>
+          <div><span>กำไรขั้นต้นต่อเดือน</span><strong class="profit-value"></strong></div>
+          <div><span>อัตรากำไร</span><strong class="margin-value"></strong></div>
+        </div>
+
+        <div class="split-section">
+          <div class="split-heading">
+            <div><h3>แบ่งสัดส่วน</h3><p>ลากจุดเพื่อกำหนดเปอร์เซ็นต์แต่ละส่วน</p></div>
+            <button class="mini-button add-point-button" type="button">＋ เพิ่มจุดแบ่ง</button>
+          </div>
+          <label class="allocation-total">
+            <span>ยอดรวมของ 100%</span>
+            <span class="money-input"><input type="number" min="0" step="1" inputmode="decimal" aria-label="ยอดรวมของ 100 เปอร์เซ็นต์" /><b>บาท</b></span>
+          </label>
+          <div class="segment-names" aria-label="ชื่อของแต่ละส่วน"></div>
+          <div class="split-bar-wrap">
+            <div class="split-bar"></div>
+            <div class="split-inputs"></div>
+          </div>
+          <div class="split-footer">
+            <span>รวม</span><strong>100%</strong>
+            <button class="text-button remove-point-button" type="button">ลบจุดสุดท้าย</button>
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="app.js?v=20261125-2"></script>
+  </body>
+</html>
